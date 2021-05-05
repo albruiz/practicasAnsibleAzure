@@ -1,0 +1,4 @@
+host=23.100.49.203
+port=22
+username=azureuser
+password=Pass.1234567

@@ -1,0 +1,97 @@
+# Description
+# ===========
+# This playbook creates an Azure Windows VM with public IP. It also cobnfigures the machine to be accessible via Ansible using WinRM.
+# This playbook originally comes from @jborean93 (https://github.com/jborean93/ansible-win-demos)
+- name: CREATE VM PLAYBOOK
+  hosts: localhost
+  connection: local
+  gather_facts: False
+  vars:
+    dnsname: '$parametros[VMNAME].$parametros[LOCATION].cloudapp.azure.com'
+    ip: \"{{ lookup('dig', '{{ dnsname }}') }}\"
+    
+  tasks:
+    - debug:  msg=\"Public DNS name {{ dnsname }} resolved to IP {{ ip }}.\"
+
+    # The following check is disabled so that the playbook does not stop upon existence of DNS name. Otherwise
+    # it cannot be re-run after VM creation
+    #  - name: Check if DNS is taken
+    #    fail: msg=\"That DNS name seems to be already taken\"
+    #    when: ip != 'NXDOMAIN'
+    
+    ## Preguntar a ruben por el check de arriba, que está quitado por si el DNS está cogido, yo diría que para la primera version no se toca,
+            
+      - name: create Azure storage account
+        azure_rm_storageaccount: ## Creamos un almacenamiento donde iran tanto la MV como el resourceGroup 
+          resource_group: '$parametros[GROUPNAME]'
+          name: '$parametros[VMNAMEMINUSCULAS]' ## NO LE CAMBIAMOS EL NOMBRE Y LUEGO LO USAREMOS, LUEGO ES LO OPTIMO?
+          account_type: Standard_LRS ## Almacenamiento local en tu region (hay varios) Premium_LRS Standard_GRS Standard_LRS Standard_RAGRS Standard_ZRS Premium_ZRS: https://docs.microsoft.com/en-us/azure/storage/common/storage-account-overview
+
+      - name: Create security group that allows SSH and HTTP #firewall además de trabajar con ACL 
+        azure_rm_securitygroup: 
+          resource_group: '$parametros[GROUPNAME]'
+          name: '$parametros[VMNAME]' ## POSTERIORMENTE SE USA ESTE NOMBRE COMO NOMBRE DE LA IP Y EN LA CREACION DE UN NIC -> PREGUNTAR A RUBEN SI ES LO OPTIMO
+          rules: 
+            - name: SSH  ## TIPO DE ACCESO SSH
+              protocol: Tcp 
+              destination_port_range: 22  
+              access: Allow  
+              priority: 101 
+              direction: Inbound
+            - name: WEB ## TIPO DE ACCESO TCP
+              protocol: Tcp
+              destination_port_range: 80  
+              access: Allow  
+              priority: 102 
+              direction: Inbound
+
+      - name: Create public IP address ## Crear una ip publica para poder conectar con la MV
+        azure_rm_publicipaddress: 
+          resource_group: '$parametros[GROUPNAME]'
+          allocation_method: Static 
+          name: '$parametros[VMNAME]'
+          ## El dominio tiene que ser todo minusculas
+          domain_name_label: '$parametros[VMNAMEMINUSCULAS]'
+
+      - name: Create NIC ## Crear una interfaz de red
+        azure_rm_networkinterface:
+          resource_group: '$parametros[GROUPNAME]'
+          name: '$parametros[VMNAME]'
+          virtual_network_name: '$parametros[VNET]'
+          subnet_name: '$parametros[SUBNET]'
+          public_ip_name: '$parametros[VMNAME]' ## SE LLAMAN ASI PORQUE NO LES HEMOS DADO ANTERIORMENTE UN NOMBRE DISTITNO AL DE LA MV
+          security_group: '$parametros[VMNAME]' ## SE LLAMAN ASI PORQUE NO LES HEMOS DADO ANTERIORMENTE UN NOMBRE DISTITNO AL DE LA MV
+
+      - name: provision new Azure virtual host
+        azure_rm_virtualmachine:
+          admin_username: $parametros[USUARIO] ## ESTE NOMBRE DE USUARIO VARIARA DEPENDIENDO DE LOS USUARIOS QUE POR PETICIÓN QUIERAN UNA MV
+          admin_password: $parametros[PASSWORD]
+          os_type: Windows ## ES EL SO BASE QUE VAMOS A USAR EN LA MV
+          resource_group: '$parametros[GROUPNAME]'
+          name: '$parametros[VMNAME]'
+          state: present ## CREAR LA MAQUINA VIRTUAL (ABSENT = ELIMINAR LA MAQUINA VIRTUAL)
+          vm_size: Standard_D1 #
+          storage_account_name: '$parametros[VMNAME]' #
+          network_interfaces: '$parametros[VMNAME]'
+          image:
+            offer: WindowsServer
+            publisher: MicrosoftWindowsServer
+            sku: 2016-Datacenter
+            version: latest
+
+      - name: create Azure vm extension to enable HTTPS WinRM listener
+        azure_rm_virtualmachine_extension:
+          name: winrm-extension
+          resource_group: '$parametros[GROUPNAME]'
+          virtual_machine_name: '$parametros[VMNAME]'
+          publisher: Microsoft.Compute
+          virtual_machine_extension_type: CustomScriptExtension
+          type_handler_version: 1.9
+          settings: '{"commandToExecute": "powershell.exe -ExecutionPolicy ByPass -EncodedCommand {{winrm_enable_script}}"}'
+          auto_upgrade_minor_version: true
+
+      - name: wait for the WinRM port to come online
+        wait_for:
+          port: 5986
+          host: '{{azure_vm.properties.networkProfile.networkInterfaces[0].properties.ipConfigurations[0].properties.publicIPAddress.properties.ipAddress}}'
+          timeout: 600

@@ -1,0 +1,6 @@
+grupoRecursos=grupo_recursos2_westeurope
+location=westeurope
+username=usuario1
+password=Pass.1234567
+vnet=vnetgr2
+subnet=subnetgr2
