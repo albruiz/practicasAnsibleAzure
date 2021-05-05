@@ -1,0 +1,13 @@
+## Aqui se crea el grupo donde se instalara las MVs
+## Se hace con Ansible, de manera remota.
+
+---
+
+- hosts: localhost
+
+  tasks:
+  - name: Create resource group
+    azure_rm_resourcegroup:
+      name: grupoPruebaPHP
+      location: francecentral
+

@@ -1,0 +1,11 @@
+## Aqui se elimina un grupo de recursos
+## Se hace con Ansible, de manera remota.
+---
+
+- hosts: localhost
+  tasks:
+  - name: Eliminar un ResourceGroup
+    azure_rm_resourcegroup:
+      name: grupoPruebaPHP
+      force_delete_nonempty: yes
+      state: absent

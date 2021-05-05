@@ -1,0 +1,14 @@
+## Aqui se crea la VNET que hay que asignar a la MV
+## Se hace con Ansible, de manera remota.
+## @author: Alberto Ruiz
+
+---
+- hosts: localhost
+
+  tasks:
+  - name: Creacion de una VNET para poderla asingar a una MV que vayamos a crear
+    azure_rm_virtualnetwork:
+      resource_group: grupoPruebaPHP
+      name: pruebaVNETPHP
+      address_prefixes_cidr:
+        - "192.168.0.0/16"

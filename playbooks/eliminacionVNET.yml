@@ -1,0 +1,14 @@
+## Aqui se elimina la VNET que se ha creado
+## Se hace con Ansible, de manera remota.
+## @author: Alberto Ruiz
+
+---
+- hosts: localhost
+
+  tasks:
+  - name: Eliminacion de una VNET creada anteriormente
+    azure_rm_virtualnetwork:
+      resource_group: grupoPruebaPHP
+      name: pruebaVNETPHP
+      state: absent
+

@@ -1,0 +1,29 @@
+---
+
+- name: CREATE VNET AND SUBNET
+  hosts: localhost
+  connection: local
+  gather_facts: False
+  tasks:
+    - name: Create a virtual network
+      azure_rm_virtualnetwork:
+        resource_group: grupo_recursos2_westeurope
+        name: vnetgr2
+        address_prefixes_cidr:
+          - "10.1.0.0/16"
+          - "172.100.0.0/16"
+
+    - name: Create a subnet
+      azure_rm_subnet:
+        resource_group: grupo_recursos2_westeurope
+        virtual_network_name: vnetgr2
+        name: subnetgr2
+        address_prefix_cidr: "10.1.0.0/24"
+
+    - name: Create a public ip address
+      azure_rm_publicipaddress:
+        resource_group: grupo_recursos2_westeurope
+        name: public_ip_gr2
+        allocation_method: static
+        domain_name: ipgr2
+
